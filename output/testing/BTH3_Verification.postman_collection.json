@@ -1,0 +1,1912 @@
+{
+  "info": {
+    "name": "BTH3 - Kiem thu sau sua loi",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "CRUD and authentication checks, plus POST/PUT regression checks for price limits, decimal precision, integer quantity and unsupported media types. Writes affect only newly created BTH3_QA products; original products are checked unchanged."
+  },
+  "item": [
+    {
+      "name": "01. Wrong login rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8080/",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"userName\": \"admin\", \"password\": \"wrong_qa_password\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Login and save JWT",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8080/",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"userName\": \"admin\", \"password\": \"123456\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "",
+              "pm.test(\"JWT returned\", () => pm.expect(j.token).to.be.a(\"string\").and.not.empty);",
+              "for (const key of [\"product_id\",\"created_at\",\"original_products\",\"overflow_id\",\"fraction_qty_id\",\"limit_id\",\"zero_id\",\"scale_id\",\"scale_response_price\"]) pm.collectionVariables.unset(key);",
+              "if (j && j.token) { pm.collectionVariables.set(\"jwt_token\", j.token); pm.collectionVariables.set(\"run_id\", String(Date.now())); pm.collectionVariables.set(\"tampered_token\", j.token.split('.').slice(0,2).join('.') + '.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Auth service validates JWT",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8080/auth"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "pm.test(\"Identity\", () => pm.expect(j.userName).to.eql(\"admin\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. GET requires authentication",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "http://localhost:8081/products"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. GET requires authentication",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "http://localhost:8081/products/2147483647"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. POST requires authentication",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 12345.67, \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. PUT requires authentication",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products/2147483647",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 12345.67, \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. DELETE requires authentication",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "http://localhost:8081/products/2147483647"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09. Fake token rejected",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{invalid_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Tampered signature rejected",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{tampered_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Expired signed token rejected",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expired_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set(\"expired_token\", [\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\", \"eyJzdWIiOiAiYWRtaW4iLCAiaWRVc2VyIjogMSwgImlhdCI6IDE3OTIyOTA3NDQsICJleHAiOiAxNzkyMjk0MzQ0fQ\", \"7WsgSsEp-pmJIOL9Gi7BVdCZiUNnWB3s6fvEig67enk\"].join(\".\"));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. List products and capture original data",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "",
+              "pm.test(\"List is array\", () => pm.expect(j.data).to.be.an(\"array\"));",
+              "if (j && Array.isArray(j.data)) pm.collectionVariables.set(\"original_products\", JSON.stringify(j.data));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Create a temporary product",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 12345.67, \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "",
+              "if (j && j.data && j.data.id) { pm.collectionVariables.set(\"product_id\", j.data.id); pm.collectionVariables.set(\"created_at\", j.data.createdAt); }",
+              "pm.test(\"Created values and generated fields\", () => { pm.expect(j.data.id).to.be.a(\"number\"); pm.expect(j.data.name).to.eql(pm.variables.replaceIn(\"BTH3_QA_{{run_id}}\")); pm.expect(j.data.description).to.eql(\"Kiểm thử sản phẩm tiếng Việt\"); pm.expect(j.data.price).to.eql(12345.67); pm.expect(j.data.quantity).to.eql(7); pm.expect(Date.parse(j.data.createdAt)).not.to.be.NaN; pm.expect(Date.parse(j.data.updatedAt)).not.to.be.NaN; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Read the newly created product",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "pm.test(\"Created values persisted\", () => { pm.expect(j.data.id).to.eql(Number(pm.collectionVariables.get(\"product_id\"))); pm.expect(j.data.price).to.eql(12345.67); pm.expect(j.data.quantity).to.eql(7); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15. List contains the temporary product",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "pm.test(\"Created product appears\", () => pm.expect(j.data.some(p => p.id === Number(pm.collectionVariables.get(\"product_id\")))).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16. Update only the temporary product",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}_UPDATED\", \"description\": \"Đã cập nhật\", \"price\": 23456.78, \"quantity\": 9}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "",
+              "pm.test(\"Updated values\", () => { pm.expect(j.data.price).to.eql(23456.78); pm.expect(j.data.quantity).to.eql(9); pm.expect(j.data.name).to.eql(pm.variables.replaceIn(\"BTH3_QA_{{run_id}}_UPDATED\")); });",
+              "pm.test(\"Creation time preserved; update time advances\", () => { pm.expect(Date.parse(j.data.createdAt)).to.eql(Date.parse(pm.collectionVariables.get(\"created_at\"))); pm.expect(Date.parse(j.data.updatedAt)).to.be.above(Date.parse(j.data.createdAt)); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17. Read confirms update persisted",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "pm.test(\"Updated data persisted\", () => { pm.expect(j.data.price).to.eql(23456.78); pm.expect(j.data.quantity).to.eql(9); pm.expect(j.data.description).to.eql(\"Đã cập nhật\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18. Blank name rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"   \", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 12345.67, \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19. Missing name rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 12345.67, \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20. Missing price rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "21. Missing quantity rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 12345.67}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "22. Negative price rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": -1, \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "23. Negative quantity rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 12345.67, \"quantity\": -1}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "24. Name exceeds 255 characters rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 12345.67, \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "25. Malformed JSON rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "26. Wrong price type rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": \"abc\", \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "27. Non-numeric ID rejected",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/abc"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "28. Unknown product returns 404",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/2147483647"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "29. Update unknown product returns 404",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products/2147483647",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 12345.67, \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "30. Delete unknown product returns 404",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/2147483647"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "31. Unsupported PATCH returns 405",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 12345.67, \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 405\", () => pm.response.to.have.status(405));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "32. Unsupported media type returns 415",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "text/plain"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 12345.67, \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 415\", () => pm.response.to.have.status(415));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "33. Price overflow should return 400",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 100000000, \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));",
+              "if (j && j.data && j.data.id) pm.collectionVariables.set(\"overflow_id\", j.data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "34. Fractional quantity should be rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 12345.67, \"quantity\": 1.9}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));",
+              "if (j && j.data && j.data.id) pm.collectionVariables.set(\"fraction_qty_id\", j.data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "35. Price at DECIMAL limit",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 99999999.99, \"quantity\": 2147483647}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "if (j && j.data && j.data.id) pm.collectionVariables.set(\"limit_id\", j.data.id);",
+              "pm.test(\"Maximum values preserved\", () => { pm.expect(j.data.price).to.eql(99999999.99); pm.expect(j.data.quantity).to.eql(2147483647); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "36. Zero price and quantity allowed",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": null, \"price\": 0, \"quantity\": 0}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "if (j && j.data && j.data.id) pm.collectionVariables.set(\"zero_id\", j.data.id);",
+              "pm.test(\"Zero and null description accepted\", () => { pm.expect(j.data.price).to.eql(0); pm.expect(j.data.quantity).to.eql(0); pm.expect(j.data.description).to.eql(null); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "37. Extra price decimals rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}\", \"description\": \"Kiểm thử sản phẩm tiếng Việt\", \"price\": 1.999, \"quantity\": 7}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));",
+              "if (j && j.data && j.data.id) pm.collectionVariables.set(\"scale_id\", j.data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "38. Rejected extra decimals leave stored price unchanged",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "pm.test(\"Stored price unchanged\", () => pm.expect(j.data.price).to.eql(23456.78));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "39. Update price overflow rejected",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}_UPDATED\", \"description\": \"Đã cập nhật\", \"price\": 100000000, \"quantity\": 9}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "40. Update extra price decimals rejected",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}_UPDATED\", \"description\": \"Đã cập nhật\", \"price\": 1.999, \"quantity\": 9}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "41. Update fractional quantity rejected",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}_UPDATED\", \"description\": \"Đã cập nhật\", \"price\": 23456.78, \"quantity\": 1.9}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "42. Update unsupported media type returns 415",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "text/plain"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}_UPDATED\", \"description\": \"Đã cập nhật\", \"price\": 23456.78, \"quantity\": 9}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 415\", () => pm.response.to.have.status(415));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "43. Invalid update rejected",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"BTH3_QA_{{run_id}}_UPDATED\", \"description\": \"Đã cập nhật\", \"price\": 23456.78, \"quantity\": -10}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "44. Invalid update leaves prior values intact",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "pm.test(\"No partial update\", () => { pm.expect(j.data.price).to.eql(23456.78); pm.expect(j.data.quantity).to.eql(9); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "45. Delete the temporary CRUD product",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "46. Deleted product returns 404",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "47. Repeated delete returns 404",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{product_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "48. Cleanup overflow_id",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{overflow_id}}"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!pm.collectionVariables.get(\"overflow_id\")) pm.execution.skipRequest();"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "49. Cleanup fraction_qty_id",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{fraction_qty_id}}"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!pm.collectionVariables.get(\"fraction_qty_id\")) pm.execution.skipRequest();"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "50. Cleanup limit_id",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{limit_id}}"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!pm.collectionVariables.get(\"limit_id\")) pm.execution.skipRequest();"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "51. Cleanup zero_id",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{zero_id}}"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!pm.collectionVariables.get(\"zero_id\")) pm.execution.skipRequest();"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "52. Cleanup scale_id",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products/{{scale_id}}"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!pm.collectionVariables.get(\"scale_id\")) pm.execution.skipRequest();"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "53. Original products remain unchanged",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": "http://localhost:8081/products"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "let j; try { j = pm.response.json(); } catch(e) {}",
+              "pm.test(\"success flag\", () => pm.expect(j.success).to.eql(true));",
+              "pm.test(\"Exact original dataset restored\", () => pm.expect(j.data).to.deep.eql(JSON.parse(pm.collectionVariables.get(\"original_products\"))));"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "jwt_token",
+      "value": ""
+    },
+    {
+      "key": "product_id",
+      "value": ""
+    },
+    {
+      "key": "run_id",
+      "value": ""
+    },
+    {
+      "key": "tampered_token",
+      "value": ""
+    },
+    {
+      "key": "expired_token",
+      "value": ""
+    },
+    {
+      "key": "invalid_token",
+      "value": "fake_qa_token"
+    },
+    {
+      "key": "created_at",
+      "value": ""
+    },
+    {
+      "key": "original_products",
+      "value": ""
+    },
+    {
+      "key": "overflow_id",
+      "value": ""
+    },
+    {
+      "key": "fraction_qty_id",
+      "value": ""
+    },
+    {
+      "key": "limit_id",
+      "value": ""
+    },
+    {
+      "key": "zero_id",
+      "value": ""
+    },
+    {
+      "key": "scale_id",
+      "value": ""
+    },
+    {
+      "key": "scale_response_price",
+      "value": ""
+    }
+  ]
+}

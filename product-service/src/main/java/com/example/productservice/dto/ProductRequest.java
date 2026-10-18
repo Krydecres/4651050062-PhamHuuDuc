@@ -1,6 +1,7 @@
 package com.example.productservice.dto;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,6 +19,7 @@ public class ProductRequest {
 
     @NotNull(message = "Giá sản phẩm không được để trống")
     @DecimalMin(value = "0.0", inclusive = true, message = "Giá sản phẩm phải lớn hơn hoặc bằng 0")
+    @Digits(integer = 8, fraction = 2, message = "Giá sản phẩm tối đa 99999999.99 và chỉ được có tối đa 2 chữ số thập phân")
     private BigDecimal price;
 
     @NotNull(message = "Số lượng không được để trống")
