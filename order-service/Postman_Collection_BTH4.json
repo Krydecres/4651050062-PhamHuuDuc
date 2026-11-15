@@ -1,0 +1,1091 @@
+{
+	"info": {
+		"_postman_id": "bth4-order-service-soa",
+		"name": "BTH4 - Order Management Service (SOA Architecture)",
+		"description": "Kiểm thử Bài thực hành số 4: Dịch vụ quản lý đơn hàng (cổng 8082).\nCần bật đủ 3 service: Auth (8080) - Product (8081) - Order (8082).\nChạy lần lượt từ trên xuống (hoặc Run collection). Request 0 sẽ tự lưu token vào biến {{jwt_token}}.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{jwt_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "auth_url",
+			"value": "http://localhost:8080"
+		},
+		{
+			"key": "product_url",
+			"value": "http://localhost:8081"
+		},
+		{
+			"key": "order_url",
+			"value": "http://localhost:8082"
+		},
+		{
+			"key": "jwt_token",
+			"value": ""
+		},
+		{
+			"key": "order_id",
+			"value": "1"
+		},
+		{
+			"key": "item_id",
+			"value": "1"
+		}
+	],
+	"item": [
+		{
+			"name": "0. Chuẩn bị",
+			"item": [
+				{
+					"name": "0.1 Đăng nhập lấy JWT (Auth Service 8080)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{auth_url}}/",
+							"host": [
+								"{{auth_url}}"
+							],
+							"path": []
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"userName\": \"admin\",\n    \"password\": \"123456\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"auth": {
+							"type": "noauth"
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 200\", function () { pm.response.to.have.status(200); });",
+									"var d = pm.response.json();",
+									"pm.collectionVariables.set(\"jwt_token\", d.token);",
+									"pm.test(\"Nhận được token JWT\", function () { pm.expect(d.token).to.be.a(\"string\").and.not.empty; });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "0.2 Xem tồn kho sản phẩm (Product Service 8081)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{product_url}}/products",
+							"host": [
+								"{{product_url}}"
+							],
+							"path": [
+								"products"
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 200\", function () { pm.response.to.have.status(200); });"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "1. Xác thực",
+			"item": [
+				{
+					"name": "1.1 Không gửi token -> 401",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/orders",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						},
+						"auth": {
+							"type": "noauth"
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 401\", function () { pm.response.to.have.status(401); });",
+									"pm.test(\"success = false\", function () { pm.expect(pm.response.json().success).to.eql(false); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "1.2 Token sai -> 401",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/orders",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						},
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "token-sai-123",
+									"type": "string"
+								}
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 401\", function () { pm.response.to.have.status(401); });",
+									"pm.test(\"success = false\", function () { pm.expect(pm.response.json().success).to.eql(false); });"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "2. Orders (đơn hàng)",
+			"item": [
+				{
+					"name": "2.1 POST /orders - Tạo đơn hàng (kiểm tra tồn kho)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{order_url}}/orders",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer_name\": \"Nguyễn Văn A\",\n    \"customer_email\": \"nguyenvana@gmail.com\",\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 1\n        },\n        {\n            \"product_id\": 3,\n            \"quantity\": 2\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 201\", function () { pm.response.to.have.status(201); });",
+									"pm.test(\"success = true\", function () { pm.expect(pm.response.json().success).to.eql(true); });",
+									"var o = pm.response.json().data;",
+									"pm.collectionVariables.set(\"order_id\", o.id);",
+									"pm.test(\"Trạng thái mặc định = pending\", function () { pm.expect(o.status).to.eql(\"pending\"); });",
+									"pm.test(\"Có 2 mặt hàng, lấy tên & giá từ Product Service\", function () {",
+									"    pm.expect(o.items.length).to.eql(2);",
+									"    o.items.forEach(function (i) { pm.expect(i.product_name).to.not.be.empty; pm.expect(i.unit_price).to.be.above(0); });",
+									"});",
+									"pm.test(\"total_price = quantity * unit_price\", function () {",
+									"    o.items.forEach(function (i) { pm.expect(Number(i.total_price)).to.be.closeTo(i.quantity * i.unit_price, 0.001); });",
+									"});",
+									"pm.test(\"total_amount = tổng total_price\", function () {",
+									"    var s = o.items.reduce(function (a, i) { return a + Number(i.total_price); }, 0);",
+									"    pm.expect(Number(o.total_amount)).to.be.closeTo(s, 0.001);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2.2 POST /orders - Vượt tồn kho -> 409",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{order_url}}/orders",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer_name\": \"Trần Thị B\",\n    \"customer_email\": \"tranthib@gmail.com\",\n    \"items\": [\n        {\n            \"product_id\": 3,\n            \"quantity\": 100000\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 409\", function () { pm.response.to.have.status(409); });",
+									"pm.test(\"success = false\", function () { pm.expect(pm.response.json().success).to.eql(false); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2.3 POST /orders - Sản phẩm không tồn tại -> 404",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{order_url}}/orders",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer_name\": \"Trần Thị B\",\n    \"customer_email\": \"tranthib@gmail.com\",\n    \"items\": [\n        {\n            \"product_id\": 9999,\n            \"quantity\": 1\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 404\", function () { pm.response.to.have.status(404); });",
+									"pm.test(\"success = false\", function () { pm.expect(pm.response.json().success).to.eql(false); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2.4 POST /orders - Dữ liệu không hợp lệ -> 400",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{order_url}}/orders",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customer_name\": \"\",\n    \"customer_email\": \"khong-phai-email\",\n    \"items\": []\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 400\", function () { pm.response.to.have.status(400); });",
+									"pm.test(\"success = false\", function () { pm.expect(pm.response.json().success).to.eql(false); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2.5 GET /orders - Danh sách đơn hàng",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/orders",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders"
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 200\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"success = true\", function () { pm.expect(pm.response.json().success).to.eql(true); });",
+									"pm.test(\"data là mảng\", function () { pm.expect(pm.response.json().data).to.be.an(\"array\"); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2.6 GET /orders/{{order_id}} - Chi tiết đơn hàng",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/orders/{{order_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders",
+								"{{order_id}}"
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 200\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"success = true\", function () { pm.expect(pm.response.json().success).to.eql(true); });",
+									"var o = pm.response.json().data;",
+									"pm.test(\"total_amount = tổng total_price của các mặt hàng\", function () {",
+									"    var s = o.items.reduce(function (a, i) { return a + Number(i.total_price); }, 0);",
+									"    pm.expect(Number(o.total_amount)).to.be.closeTo(s, 0.001);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2.7 GET /orders/99999 - Không tồn tại -> 404",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/orders/99999",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders",
+								"99999"
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 404\", function () { pm.response.to.have.status(404); });",
+									"pm.test(\"success = false\", function () { pm.expect(pm.response.json().success).to.eql(false); });"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "3. Order items (chi tiết đơn hàng)",
+			"item": [
+				{
+					"name": "3.1 POST /order_items - Thêm mặt hàng vào đơn",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{order_url}}/order_items",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"order_items"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"order_id\": {{order_id}},\n    \"product_id\": 3,\n    \"quantity\": 1\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 201\", function () { pm.response.to.have.status(201); });",
+									"pm.test(\"success = true\", function () { pm.expect(pm.response.json().success).to.eql(true); });",
+									"var i = pm.response.json().data;",
+									"pm.collectionVariables.set(\"item_id\", i.id);",
+									"pm.test(\"total_price = quantity * unit_price\", function () { pm.expect(Number(i.total_price)).to.be.closeTo(i.quantity * i.unit_price, 0.001); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "3.2 GET /order_items - Tất cả mặt hàng",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/order_items",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"order_items"
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 200\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"success = true\", function () { pm.expect(pm.response.json().success).to.eql(true); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "3.3 GET /order_items?order_id= - Mặt hàng của 1 đơn",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/order_items?order_id={{order_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"order_items"
+							],
+							"query": [
+								{
+									"key": "order_id",
+									"value": "{{order_id}}"
+								}
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 200\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"Đơn có 3 mặt hàng\", function () { pm.expect(pm.response.json().data.length).to.eql(3); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "3.4 GET /order_items/{{item_id}} - Chi tiết mặt hàng",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/order_items/{{item_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"order_items",
+								"{{item_id}}"
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 200\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"success = true\", function () { pm.expect(pm.response.json().success).to.eql(true); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "3.5 PUT /order_items/{{item_id}} - Cập nhật số lượng",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{order_url}}/order_items/{{item_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"order_items",
+								"{{item_id}}"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"quantity\": 3\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 200\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"quantity = 3\", function () { pm.expect(pm.response.json().data.quantity).to.eql(3); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "3.6 PUT /order_items/{{item_id}} - Vượt tồn kho -> 409",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{order_url}}/order_items/{{item_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"order_items",
+								"{{item_id}}"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"quantity\": 100000\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 409\", function () { pm.response.to.have.status(409); });",
+									"pm.test(\"success = false\", function () { pm.expect(pm.response.json().success).to.eql(false); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "3.7 GET /orders/{{order_id}} - Tổng tiền đã tự cập nhật",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/orders/{{order_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders",
+								"{{order_id}}"
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 200\", function () { pm.response.to.have.status(200); });",
+									"var o = pm.response.json().data;",
+									"pm.test(\"total_amount = tổng total_price của các mặt hàng\", function () {",
+									"    var s = o.items.reduce(function (a, i) { return a + Number(i.total_price); }, 0);",
+									"    pm.expect(Number(o.total_amount)).to.be.closeTo(s, 0.001);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "3.8 DELETE /order_items/{{item_id}} - Xóa mặt hàng",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/order_items/{{item_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"order_items",
+								"{{item_id}}"
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 200\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"success = true\", function () { pm.expect(pm.response.json().success).to.eql(true); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "3.9 GET /order_items/{{item_id}} - Đã xóa -> 404",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/order_items/{{item_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"order_items",
+								"{{item_id}}"
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 404\", function () { pm.response.to.have.status(404); });"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "4. Cập nhật trạng thái đơn hàng",
+			"item": [
+				{
+					"name": "4.1 PUT /orders/{{order_id}} - Trạng thái sai -> 400",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{order_url}}/orders/{{order_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders",
+								"{{order_id}}"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"shipping\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 400\", function () { pm.response.to.have.status(400); });",
+									"pm.test(\"success = false\", function () { pm.expect(pm.response.json().success).to.eql(false); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "4.2 PUT /orders/{{order_id}} - pending -> completed",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{order_url}}/orders/{{order_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders",
+								"{{order_id}}"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"completed\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 200\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"status = completed\", function () { pm.expect(pm.response.json().data.status).to.eql(\"completed\"); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "4.3 PUT /orders/{{order_id}} - completed -> cancelled bị chặn (409)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{order_url}}/orders/{{order_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders",
+								"{{order_id}}"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"cancelled\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 409\", function () { pm.response.to.have.status(409); });",
+									"pm.test(\"success = false\", function () { pm.expect(pm.response.json().success).to.eql(false); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "4.4 POST /order_items vào đơn đã completed -> 409",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{order_url}}/order_items",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"order_items"
+							]
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"order_id\": {{order_id}},\n    \"product_id\": 2,\n    \"quantity\": 1\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 409\", function () { pm.response.to.have.status(409); });",
+									"pm.test(\"success = false\", function () { pm.expect(pm.response.json().success).to.eql(false); });"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "5. Xóa đơn hàng",
+			"item": [
+				{
+					"name": "5.1 DELETE /orders/{{order_id}} - Xóa đơn hàng",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/orders/{{order_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders",
+								"{{order_id}}"
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 200\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"success = true\", function () { pm.expect(pm.response.json().success).to.eql(true); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "5.2 GET /orders/{{order_id}} - Đã xóa -> 404",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/orders/{{order_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"orders",
+								"{{order_id}}"
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 404\", function () { pm.response.to.have.status(404); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "5.3 GET /order_items?order_id= - Mặt hàng cũng bị xóa",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{order_url}}/order_items?order_id={{order_id}}",
+							"host": [
+								"{{order_url}}"
+							],
+							"path": [
+								"order_items"
+							],
+							"query": [
+								{
+									"key": "order_id",
+									"value": "{{order_id}}"
+								}
+							]
+						}
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"HTTP status = 404\", function () { pm.response.to.have.status(404); });"
+								]
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}
