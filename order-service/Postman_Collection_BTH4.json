@@ -1,6 +1,5 @@
 {
 	"info": {
-		"_postman_id": "bth4-order-service-soa",
 		"name": "BTH4 - Order Management Service (SOA Architecture)",
 		"description": "Kiểm thử Bài thực hành số 4: Dịch vụ quản lý đơn hàng (cổng 8082).\nCần bật đủ 3 service: Auth (8080) - Product (8081) - Order (8082).\nChạy lần lượt từ trên xuống (hoặc Run collection). Request 0 sẽ tự lưu token vào biến {{jwt_token}}.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"

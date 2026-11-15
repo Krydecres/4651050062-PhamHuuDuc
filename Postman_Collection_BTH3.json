@@ -1,6 +1,5 @@
 {
 	"info": {
-		"_postman_id": "bth3-product-service-soa",
 		"name": "BTH3 - Product Management Service (SOA Architecture)",
 		"description": "Bộ sưu tập kiểm thử API cho Bài Thực Hành Số 3: Dịch vụ Quản lý sản phẩm (SOA) xác thực qua Auth Service BTH2.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
