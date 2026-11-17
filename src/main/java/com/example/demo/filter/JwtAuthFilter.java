@@ -24,6 +24,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         this.jwtService = jwtService;
     }
 
+    /**
+     * Không kiểm tra token với API đăng nhập ("/" và "/login"):
+     * đăng nhập là để LẤY token mới, nên dù client còn gửi kèm token cũ đã hết hạn
+     * (ví dụ Postman còn lưu biến token từ lần chạy trước) thì vẫn phải đăng nhập được.
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        return path.isEmpty() || path.equals("/") || path.equals("/login") || path.equals("/login/");
+    }
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
